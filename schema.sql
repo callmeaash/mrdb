@@ -46,3 +46,27 @@ CREATE TABLE "watch_history"(
     "watched_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY ("user_id", "movie_id")
 );
+
+
+CREATE INDEX "movie_title" ON "movie" ("title");
+
+
+CREATE FUNCTION add_to_watch_history()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO "watch_history" ("user_id", "movie_id")
+    SELECT NEW.user_id, NEW.movie_id
+    WHERE NOT EXISTS(
+        SELECT 1 FROM "watch_history"
+        WHERE user_id = NEW.user_id AND movie_id = NEW.movie_id
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+
+CREATE TRIGGER  "after_rating_insert"
+AFTER INSERT ON "ratings"
+FOR EACH ROW
+EXECUTE FUNCTION add_to_watch_history();

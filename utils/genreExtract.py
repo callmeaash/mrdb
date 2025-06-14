@@ -13,4 +13,6 @@ with open("movies.csv", encoding='utf-8') as fp:
 with open("genres.csv", "w", newline="", encoding="utf-8") as fw:
     writer = csv.writer(fw)
     for genre in genres:
+        if genre == "\\N":
+            continue
         writer.writerow([genre])
