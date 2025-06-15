@@ -120,11 +120,14 @@ BEGIN
     JOIN movie_genre ON movie.id = movie_genre.movie_id
     JOIN genre ON movie_genre.genre_id = genre.id
     WHERE genre.name = favorite_genre AND movie.release_year <= EXTRACT(YEAR FROM CURRENT_DATE) AND
-    movie.id NOT IN (
-        SELECT movie_id FROM "watchlist" WHERE user_id = userID
-        UNION 
-        SELECT movie_id FROM "watch_history" WHERE user_id = userID
-    )
+    AND NOT EXISTS (
+        SELECT 1 FROM watchlist wl
+        WHERE wl.user_id = userID AND wl.movie_id = movie.id
+      )
+    AND NOT EXISTS (
+        SELECT 1 FROM watch_history wh
+        WHERE wh.user_id = userID AND wh.movie_id = movie.id
+      )
     ORDER BY release_year DESC
     LIMIT 10;
 END;
@@ -149,4 +152,40 @@ SELECT username, title, rating FROM "user"
 JOIN "ratings" ON "user".id = ratings.user_id
 JOIN "movie" ON ratings.movie_id = movie.id
 ORDER BY ratings.rated_date DESC, title ASC;
+
+
+CREATE OR REPLACE FUNCTION get_ids(IN follower TEXT, IN followed TEXT)
+RETURNS TABLE(follower_id INTEGER, followed_id INTEGER) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT uf.follower_id, uf.followed_id FROM "user_follows" uf
+    JOIN "user" u1 ON uf.follower_id = u1.id
+    JOIN "user" u2 ON uf.followed_id = u2.id
+    WHERE u1.username = follower AND u2.username = followed;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION recommend_by_followed_rating(IN follower TEXT, IN followed TEXT)
+RETURNS TABLE(user_id INTEGER, title TEXT, rating NUMERIC(2,1)) AS $$
+DECLARE
+    followedID INTEGER;
+    followerID INTEGER;
+BEGIN
+    SELECT follower_id, followed_id INTO followerID, followedID
+    FROM get_ids(follower, followed);
+
+    RETURN QUERY
+    SELECT r.user_id, m.title, r.rating FROM "ratings" r
+    JOIN "movie" m ON r.movie_id = m.id
+    WHERE r.user_id = followedID
+    AND NOT EXISTS(
+        SELECT 1 FROM "watch_history" wh
+        WHERE wh.user_id = followerID AND wh.movie_id = r.movie_id
+    )
+    
+    ORDER BY r.rating DESC
+    LIMIT 10;
+END;
+$$ LANGUAGE plpgsql;
 
