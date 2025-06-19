@@ -1,4 +1,4 @@
--- In this SQL file, write (and comment!) the schema of your database, including the CREATE TABLE, CREATE INDEX, CREATE VIEW, etc. statements that compose it
+-- Schema statemnts
 
 CREATE TABLE "user"(
     "id" SERIAL PRIMARY KEY,
@@ -57,6 +57,7 @@ CREATE TABLE "watchlist"(
 CREATE INDEX "movie_title" ON "movie" ("title");
 
 
+-- Function that adds movie in watch_history automatically when triggered
 CREATE FUNCTION add_to_watch_history()
 RETURNS TRIGGER
 AS $$
@@ -71,13 +72,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
+--Triggers add_to_watch history() function when record is inserted in rating table
 CREATE TRIGGER  "after_rating_insert"
 AFTER INSERT ON "ratings"
 FOR EACH ROW
 EXECUTE FUNCTION add_to_watch_history();
 
 
+-- View to select movies a user watched recently
 CREATE VIEW recent_watches AS
 SELECT username, title FROM "user"
 JOIN "watch_history" ON "user".id = watch_history.user_id
@@ -85,11 +87,7 @@ JOIN "movie" ON watch_history.movie_id = movie.id
 ORDER BY watch_history.watched_at DESC;
 
 
-CREATE VIEW movie_genre_view AS
-SELECT movie_id, name  FROM "genre" JOIN "movie_genre" ON genre.id = movie_genre.genre_id
-ORDER BY name ASC;
-
-
+-- Function that returns the highest rated movie genre by a user
 CREATE FUNCTION highest_rated_genre(IN userID INTEGER)
 RETURNS TEXT
 AS $$
@@ -107,6 +105,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+
+-- Function that returns movies from a certain genre which user has rated highly
 CREATE OR REPLACE FUNCTION movie_recommend(IN userID INTEGER)
 RETURNS TABLE(title TEXT, release_year INTEGER)
 AS $$
@@ -134,6 +134,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+-- Function to insert data in the rating table
 CREATE OR REPLACE FUNCTION give_rating(IN user_name TEXT, IN movie_name TEXT, IN rating NUMERIC(2,1))
 RETURNS VOID AS
 $$
@@ -147,6 +148,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+-- View which selects all rating to a movie given by a user
 CREATE VIEW user_rated_movies AS
 SELECT username, title, rating FROM "user"
 JOIN "ratings" ON "user".id = ratings.user_id
@@ -154,6 +156,7 @@ JOIN "movie" ON ratings.movie_id = movie.id
 ORDER BY ratings.rated_date DESC, title ASC;
 
 
+-- Returns follower and following id of users only if there is a relation
 CREATE OR REPLACE FUNCTION get_ids(IN follower TEXT, IN followed TEXT)
 RETURNS TABLE(follower_id INTEGER, followed_id INTEGER) AS $$
 BEGIN
@@ -166,6 +169,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 
+-- Selects movies which are rated highly by person who the user follows
 CREATE OR REPLACE FUNCTION recommend_by_followed_rating(IN follower TEXT, IN followed TEXT)
 RETURNS TABLE(user_id INTEGER, title TEXT, rating NUMERIC(2,1)) AS $$
 DECLARE
